@@ -167,6 +167,13 @@ uint8_t dir_fill(char* dname){
                 dir_entries--;  //roll-back
                 continue;       //next file
             }
+
+            /* Ignore crud that windows puts on USB sticks sometimes */
+            if (strcmp(fil->d_name, "System Volume Information") == 0) {
+                dir_entries--;  //roll-back
+                continue;       //next file
+            }
+
             dir_buf[tail++] = ' ';
         }
         len = strlen(fil->d_name);
@@ -398,7 +405,7 @@ void main(void){
         locifw_version[2], locifw_version[1], locifw_version[0]);
 
     return_possible = mia_restore_buffer_ok();
-    ui[IDX_TITLE].x = 39-strlen(txt_title);
+    ui[IDX_TITLE].x = 38-strlen(txt_title);
     ui[IDX_HELP2].data = return_possible ? txt_help2a : txt_help2b;
 
     if(!persist_get_loci_cfg(&loci_cfg)){
