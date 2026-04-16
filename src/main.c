@@ -15,6 +15,7 @@ extern uint8_t irq_ticks;
 #pragma zpsym ("irq_ticks")
 
 char txt_title[40];
+char txt_page[12];
 const char txt_spinner[] = "/-\\|";
 const char txt_warn_sign[] = "\x01!\x03";
 const char txt_booting[] = "Booting";
@@ -30,6 +31,7 @@ char dir_buf[DIR_BUF_SIZE];
 char** dir_ptr_list = (char **)&dir_buf[DIR_BUF_SIZE];  //Reverse array
 unsigned int dir_entries;
 int dir_offset;
+uint8_t curr_page, num_pages;
 char dir_lpage[2];
 char dir_rpage[2];
 uint8_t dir_needs_refresh;
@@ -50,7 +52,7 @@ extern void init_display(void);
 
 void main(void);
 
-#define UI_FILE_START 7
+#define UI_FILE_START 8
 tui_widget ui[UI_FILE_START+DIR_PAGE_SIZE+1] = {
     { TUI_START,  1, 0, 0, 0 },
     { TUI_TXT,   20, 0,20, txt_title },
@@ -59,6 +61,7 @@ tui_widget ui[UI_FILE_START+DIR_PAGE_SIZE+1] = {
     { TUI_TXT,    1, HEADER_SIZE,25, loci_cfg.path},
     { TUI_TXT,   33, HEADER_SIZE+DIR_PAGE_SIZE+1, 1, dir_lpage},
     { TUI_TXT,   34, HEADER_SIZE+DIR_PAGE_SIZE+1, 1, dir_rpage},
+    { TUI_TXT,   18, HEADER_SIZE+DIR_PAGE_SIZE+1, 10, txt_page},
     { TUI_END,    0, 0, 0, 0 }
 };
 
@@ -66,6 +69,7 @@ tui_widget ui[UI_FILE_START+DIR_PAGE_SIZE+1] = {
 #define IDX_HELP2 3
 #define IDX_LPAGE 5
 #define IDX_RPAGE 6
+#define IDX_PAGE 7
 
 
 tui_widget warning[] = {
@@ -148,6 +152,7 @@ uint8_t dir_fill(char* dname){
         dir_entries = 1;
     }
     dir_offset = 0;
+    curr_page = 1;
     ret = 1;
     //DBG_STATUS("rdir");
     while(tail < DIR_BUF_SIZE){             //Safeguard
@@ -190,6 +195,8 @@ uint8_t dir_fill(char* dname){
     closedir(dir);
     //DBG_STATUS("    ");
 
+    num_pages = (dir_entries / DIR_PAGE_SIZE) + 1;
+
     qsort(&dir_ptr_list[-(dir_entries)], dir_entries, sizeof(char*), dir_cmp);
     dir_needs_refresh = 0;
     return ret;
@@ -203,8 +210,11 @@ void parse_files_to_widget(void){
     //Directory page out-of-bounds checks
     if(dir_offset >= dir_entries){
         dir_offset -= DIR_PAGE_SIZE;
+        if (curr_page > 1) /* Just in case this gets out of sync */
+            curr_page--;
     }
-    if(dir_offset < 0){
+    if((dir_offset < 0) || (curr_page < 1)) {
+        curr_page = 1;
         dir_offset = 0;
     }
     dir_idx = &dir_ptr_list[-(dir_entries-dir_offset)]; //(char**)(dir_ptr_list - dir_entries + offset);
@@ -213,12 +223,18 @@ void parse_files_to_widget(void){
     for(i=0; (i < DIR_PAGE_SIZE) && ((i+dir_offset) < dir_entries); i++){
         widget->type = TUI_SEL;
         widget->x = 1;
-        widget->y = i+4;
+        widget->y = i+HEADER_SIZE+1;
         widget->len = 34;
         widget->data = dir_idx[i]; //dir_ptr_list[-(dir_entries-offset-i)];
         widget = &widget[1];
     }
     widget->type = TUI_END;
+
+    if (num_pages > 1) {
+        sprintf(txt_page, "Page %u/%u", curr_page, num_pages);
+    } else {
+        strcpy(txt_page, "----------");
+    }
 
     dir_lpage[0] = '-';
     dir_rpage[0] = '-';
@@ -297,6 +313,7 @@ void DisplayKey(unsigned char key)
 
         case(KEY_LEFT):
             dir_offset -= DIR_PAGE_SIZE;
+            curr_page--;
             parse_files_to_widget();
             print_filebox();
             tui_draw(ui);
@@ -306,6 +323,7 @@ void DisplayKey(unsigned char key)
 
         case(KEY_RIGHT):
             dir_offset += DIR_PAGE_SIZE;
+            curr_page++;
             parse_files_to_widget();
             print_filebox();
             tui_draw(ui);
@@ -341,6 +359,7 @@ void DisplayKey(unsigned char key)
             switch(tui_get_current()){
                 case(IDX_LPAGE):
                     dir_offset -= DIR_PAGE_SIZE;
+                    curr_page--;
                     parse_files_to_widget();
                     print_filebox();
                     tui_draw(ui);
@@ -349,6 +368,7 @@ void DisplayKey(unsigned char key)
                     break;
                 case(IDX_RPAGE):
                     dir_offset += DIR_PAGE_SIZE;
+                    curr_page++;
                     parse_files_to_widget();
                     print_filebox();
                     tui_draw(ui);
