@@ -159,17 +159,17 @@ uint8_t dir_fill(char* dname){
         }
         dir_ptr_list[-(++dir_entries)] = &dir_buf[tail];  
         if(fil->d_attrib & DIR_ATTR_DIR){
+            /* Ignore crud that windows puts on USB sticks sometimes */
+            if (strcmp(fil->d_name, "System Volume Information") == 0) {
+                dir_entries--;  //roll-back
+                continue;       //next file
+            }
+
             dir_buf[tail++] = '/';
         }else if(fil->d_attrib & DIR_ATTR_SYS){
             dir_buf[tail++] = '[';
         }else{
             if ((!ends_in(fil->d_name, ".dsk")) && (!ends_in(fil->d_name, ".tap"))) {
-                dir_entries--;  //roll-back
-                continue;       //next file
-            }
-
-            /* Ignore crud that windows puts on USB sticks sometimes */
-            if (strcmp(fil->d_name, "System Volume Information") == 0) {
                 dir_entries--;  //roll-back
                 continue;       //next file
             }
